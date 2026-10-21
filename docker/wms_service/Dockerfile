@@ -190,6 +190,8 @@ USER www-data
 WORKDIR /home/oe2/onearth/docker/wms_service
 CMD sh start_wms_service.sh "$ENDPOINT_REFRESH" "$GC_HEALTHCHECK" "$S3_CONFIGS" "$SHAPEFILE_SYNC" "$USE_LOCAL_SHAPEFILES" "$SERVER_STATUS" "$USE_SSL" "$SERVER_NAME"
 
-#interval:30s, timeout:30s, start-period:60s, retries:3
-HEALTHCHECK --start-period=60s \
+# start-period must exceed the worst-case GC_HEALTHCHECK wait in start_wms_service.sh
+# (time_out=600 with 60s sleeps plus up to 60s per curl ~= 1260s) plus endpoint configuration time
+#interval:30s, timeout:30s, start-period:1500s, retries:3
+HEALTHCHECK --interval=30s --timeout=30s --start-period=1500s --retries=3 \
   CMD curl --fail "http://localhost/wms/oe-status_reproject/wms.cgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/jpeg&TRANSPARENT=true&LAYERS=Raster_Status,Vector_Status&CRS=EPSG:3857&STYLES=&WIDTH=256&HEIGHT=256&BBOX=-20037508.34,-20037508.34,20037508.34,20037508.34" || exit 1
