@@ -167,12 +167,18 @@ else
   rm -f /etc/httpd/conf.d/oe2_ssl.conf
 fi
 
+# Remove stale mod_fcgid sockets left over from a previous run
+rm -f /etc/httpd/run/fcgidsock/*
+
 echo "[$(date)] Restarting Apache server" >> /var/log/onearth/config.log
 /usr/sbin/httpd -k start
 sleep 2
 
 # Run logrotate hourly
 echo "0 * * * * /etc/cron.hourly/logrotate" >> /etc/crontab
+
+# Clean up temp files older than 60 minutes
+echo "*/30 * * * * find /tmp -mindepth 1 -type f -mmin +60 -delete" >> /etc/crontab
 
 # Start cron
 supercronic -debug /etc/crontab > /var/log/cron_jobs.log 2>&1 &
