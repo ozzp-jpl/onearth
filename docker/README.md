@@ -75,6 +75,9 @@ OnEarth Docker containers accept the following environment variables. Use the `-
 * USE_LOCAL_SHAPEFILES: `true/false` (defaults `false`) whether to configure OnEarth to load shapefiles from `SHAPEFILE_BUCKET` (when `false`) or from `/onearth/shapefiles/` (when `true`) for WMS requests. Use of local files is generally much faster than reading from S3. Ignored when `SHAPEFILE_BUCKET` isn't specified.
 * ENDPOINT_REFRESH: Interval for refreshing the WMS endpoints in minutes
 * SERVER_STATUS: `true/false` (defaults `false`) whether to enable the [mod_status](https://httpd.apache.org/docs/2.4/mod/mod_status.html) Apache server status page for this service (/server-status)
+* MS_DEBUGLEVEL: MapServer debug level `0`-`5` (defaults `0`). Applied to the `Debug` line of every mapfile header in `/etc/onearth/config/mapserver/` and passed to mapserv.fcgi processes; invalid values fall back to `0`
+* CPL_DEBUG: `ON/OFF` (defaults `OFF`) GDAL debug output, passed to mapserv.fcgi processes
+* PROJ_DEBUG: `ON/OFF` (defaults `OFF`) PROJ debug output, passed to mapserv.fcgi processes
 * HealthCheck: http://localhost/wms/oe-status_reproject/wms.cgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/jpeg&TRANSPARENT=true&LAYERS=Raster_Status,Vector_Status&CRS=EPSG:3857&STYLES=&WIDTH=256&HEIGHT=256&BBOX=-20037508.34,-20037508.34,20037508.34,20037508.34
 
 See [OnEarth Configuration](../doc/configuration.md) for more information.

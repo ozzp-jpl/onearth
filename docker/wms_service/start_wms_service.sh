@@ -73,6 +73,35 @@ cp ../oe-status/layers/* $(yq eval ".layer_config_source" /etc/onearth/config/en
 mkdir -p $(yq eval ".twms_service.internal_endpoint" /etc/onearth/config/endpoint/oe-status_reproject.yaml)
 cp ../oe-status/mapserver/oe-status_reproject.header /etc/onearth/config/mapserver/
 
+# MapServer/GDAL/PROJ debug levels (production defaults; override per environment, e.g. docker run -e MS_DEBUGLEVEL=3)
+MS_DEBUGLEVEL=${MS_DEBUGLEVEL:-0}
+CPL_DEBUG=${CPL_DEBUG:-OFF}
+PROJ_DEBUG=${PROJ_DEBUG:-OFF}
+case "$MS_DEBUGLEVEL" in
+  [0-5]) ;;
+  *)
+    echo "[$(date)] Invalid MS_DEBUGLEVEL '$MS_DEBUGLEVEL' (must be 0-5), using 0" >> /var/log/onearth/config.log
+    MS_DEBUGLEVEL=0
+    ;;
+esac
+echo "[$(date)] Using MS_DEBUGLEVEL=$MS_DEBUGLEVEL CPL_DEBUG=$CPL_DEBUG PROJ_DEBUG=$PROJ_DEBUG" >> /var/log/onearth/config.log
+
+# A DEBUG line in a mapfile overrides MS_DEBUGLEVEL, so apply the level to the headers as well
+for h in /etc/onearth/config/mapserver/*.header; do
+  [ -f "$h" ] || continue
+  sed -i -E "s/^([[:space:]]*)DEBUG[[:space:]]+([0-9]+|ON|OFF)[[:space:]]*$/\1Debug $MS_DEBUGLEVEL/I" "$h" \
+    || echo "[$(date)] WARNING: could not set Debug level in $h" >> /var/log/onearth/config.log
+done
+
+# mapserv.fcgi processes don't inherit the container environment
+cat > /etc/httpd/conf.d/oe2_wms_debug.conf <<EOS
+<IfModule fcgid_module>
+    FcgidInitialEnv MS_DEBUGLEVEL $MS_DEBUGLEVEL
+    FcgidInitialEnv CPL_DEBUG $CPL_DEBUG
+    FcgidInitialEnv PROJ_DEBUG $PROJ_DEBUG
+</IfModule>
+EOS
+
 # Copy tilematrixsets config file
 mkdir -p /etc/onearth/config/conf/
 cp /home/oe2/onearth/src/modules/mod_wmts_wrapper/configure_tool/tilematrixsets.xml /etc/onearth/config/conf/
