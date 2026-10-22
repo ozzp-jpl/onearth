@@ -22,6 +22,10 @@ if [ -n "${ONEARTH_LOG_ROOT:-}" ]; then
         continue
       fi
       if cp -an "/var/log/$d/." "$LOG_DIR/$d/"; then
+        if [ ! -w "$LOG_DIR/$d" ] || [ -n "$(find "$LOG_DIR/$d" -type f ! -writable 2>/dev/null | head -n 1)" ]; then
+          log_root_warning "$LOG_DIR/$d is not writable or contains files not writable by $(id -un); keeping local /var/log/$d"
+          continue
+        fi
         if ! rm -rf "/var/log/$d" || ! ln -s "$LOG_DIR/$d" "/var/log/$d"; then
           log_root_warning "Could not link /var/log/$d to $LOG_DIR/$d"
         fi
@@ -29,10 +33,14 @@ if [ -n "${ONEARTH_LOG_ROOT:-}" ]; then
         log_root_warning "Could not copy /var/log/$d to $LOG_DIR/$d; keeping local logs"
       fi
     done
-    if touch "$LOG_DIR/cron_jobs.log" && ln -sfn "$LOG_DIR/cron_jobs.log" /var/log/cron_jobs.log; then
-      echo "[$(date)] Logs are going to $LOG_DIR" >> /var/log/onearth/config.log
+    if touch "$LOG_DIR/cron_jobs.log" && [ -w "$LOG_DIR/cron_jobs.log" ]; then
+      if ln -sfn "$LOG_DIR/cron_jobs.log" /var/log/cron_jobs.log; then
+        echo "[$(date)] Logs are going to $LOG_DIR" >> /var/log/onearth/config.log
+      else
+        log_root_warning "Could not link /var/log/cron_jobs.log to $LOG_DIR/cron_jobs.log; keeping local /var/log/cron_jobs.log"
+      fi
     else
-      log_root_warning "Could not link /var/log/cron_jobs.log to $LOG_DIR/cron_jobs.log"
+      log_root_warning "$LOG_DIR/cron_jobs.log is not writable by $(id -un); keeping local /var/log/cron_jobs.log"
     fi
   else
     log_root_warning "ONEARTH_LOG_ROOT '$ONEARTH_LOG_ROOT' is not writable; keeping logs in /var/log"
