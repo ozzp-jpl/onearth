@@ -75,8 +75,8 @@ OnEarth Docker containers accept the following environment variables. Use the `-
 * USE_LOCAL_SHAPEFILES: `true/false` (defaults `false`) whether to configure OnEarth to load shapefiles from `SHAPEFILE_BUCKET` (when `false`) or from `/onearth/shapefiles/` (when `true`) for WMS requests. Use of local files is generally much faster than reading from S3. Ignored when `SHAPEFILE_BUCKET` isn't specified.
 * ENDPOINT_REFRESH: Interval for refreshing the WMS endpoints in minutes
 * SERVER_STATUS: `true/false` (defaults `false`) whether to enable the [mod_status](https://httpd.apache.org/docs/2.4/mod/mod_status.html) Apache server status page for this service (/server-status)
-* ONEARTH_LOG_ROOT: optional writable log mount. Logs go to `$ONEARTH_LOG_ROOT/<container hostname>/{mapserver,onearth,httpd,cron_jobs.log}`; the directory must be writable by the container's `www-data` user; if it is unwritable (or contains files it can't write), logs fall back to `/var/log`
-* ONEARTH_LOG_RETENTION_DAYS: number of days to retain per-container log directories under `ONEARTH_LOG_ROOT` (defaults to `7`). A daily job at 03:17 removes other containers' directories with no writes in that many days; a container never removes its own directory
+* ONEARTH_LOG_ROOT: optional writable, dedicated log directory (e.g. `/onearth/logs/wms`). Logs go to `$ONEARTH_LOG_ROOT/<container hostname>/{mapserver,onearth,httpd,cron_jobs.log}`; it must be writable by the container's `www-data` user; if it is unwritable (or contains files it can't write), logs fall back to `/var/log`. Only child directories carrying the regular `.onearth-wms-logs` marker are eligible for pruning
+* ONEARTH_LOG_RETENTION_DAYS: number of days to retain marked per-container log directories under `ONEARTH_LOG_ROOT` (defaults to `7`). A daily job at 03:17 removes other marked directories with no writes in that many days; unmarked directories and a container's own directory are never removed
 * MS_DEBUGLEVEL: MapServer debug level `0`-`5` (defaults `0`). Applied to the `Debug` line of every mapfile header in `/etc/onearth/config/mapserver/` and passed to mapserv.fcgi processes; invalid values fall back to `0`
 * CPL_DEBUG: `ON/OFF` (defaults `OFF`) GDAL debug output, passed to mapserv.fcgi processes and applied to `CONFIG "CPL_DEBUG"` lines in mapfile headers; invalid values fall back to `OFF`
 * PROJ_DEBUG: `ON/OFF` (defaults `OFF`) PROJ debug output, passed to mapserv.fcgi processes and applied to `CONFIG "PROJ_DEBUG"` lines in mapfile headers; invalid values fall back to `OFF`
@@ -94,7 +94,7 @@ Production ECS EC2 hosts already mount EFS at `/onearth` and bind-mount it into 
 ]
 ```
 
-Each container writes under its own `<hostname>` subdirectory. In ECS bridge mode, the hostname is the short container ID, so each new task creates a new directory. A daily cleanup job at 03:17 removes inactive directories according to `ONEARTH_LOG_RETENTION_DAYS` (default `7`), excluding the current container's directory. For a direct Docker run using an EC2 host where EFS is mounted at `/onearth`:
+Each container writes under its own `<hostname>` subdirectory. In ECS bridge mode, the hostname is the short container ID, so each new task creates a new directory. A daily cleanup job at 03:17 removes inactive child directories carrying the `.onearth-wms-logs` marker according to `ONEARTH_LOG_RETENTION_DAYS` (default `7`), excluding the current container's directory. Keep `ONEARTH_LOG_ROOT` dedicated to WMS logs; unmarked directories are never pruned. For a direct Docker run using an EC2 host where EFS is mounted at `/onearth`:
 
 ```sh
 docker run -v /onearth:/onearth -e ONEARTH_LOG_ROOT=/onearth/logs/wms \

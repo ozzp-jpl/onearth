@@ -18,7 +18,7 @@ if [ -n "${ONEARTH_LOG_ROOT:-}" ]; then
   LOG_DIR="$ONEARTH_LOG_ROOT/$(cat /proc/sys/kernel/hostname)"
   if mkdir -p "$LOG_DIR/mapserver" "$LOG_DIR/onearth" "$LOG_DIR/httpd" && [ -w "$LOG_DIR" ]; then
     LOG_ROOT_ACTIVE=true
-    LOG_HOST=$(basename "$LOG_DIR")
+    touch "$LOG_DIR/.onearth-wms-logs"
     for d in mapserver onearth httpd; do
       if [ -L "/var/log/$d" ] && [ "$(readlink "/var/log/$d")" = "$LOG_DIR/$d" ]; then
         continue
@@ -273,10 +273,7 @@ echo "*/30 * * * * find /tmp -mindepth 1 -type f -mmin +60 -delete" >> /etc/cron
 
 # Remove log directories left on ONEARTH_LOG_ROOT by containers that no longer exist
 if [ "$LOG_ROOT_ACTIVE" = true ]; then
-  case "$ONEARTH_LOG_RETENTION_DAYS" in
-    ''|*[!0-9]*|0) ONEARTH_LOG_RETENTION_DAYS=7 ;;
-  esac
-  echo "17 3 * * * sh /home/oe2/onearth/docker/wms_service/cleanup_log_root.sh \"$ONEARTH_LOG_ROOT\" \"$ONEARTH_LOG_RETENTION_DAYS\" \"$LOG_HOST\"" >> /etc/crontab
+  echo "17 3 * * * sh /home/oe2/onearth/docker/wms_service/cleanup_log_root.sh" >> /etc/crontab
 fi
 
 # Start cron
