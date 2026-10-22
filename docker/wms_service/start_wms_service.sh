@@ -84,12 +84,30 @@ case "$MS_DEBUGLEVEL" in
     MS_DEBUGLEVEL=0
     ;;
 esac
+case "$CPL_DEBUG" in
+  [Oo][Nn]|[Oo][Ff][Ff]) ;;
+  *)
+    echo "[$(date)] Invalid CPL_DEBUG (must be ON or OFF), using OFF" >> /var/log/onearth/config.log
+    CPL_DEBUG=OFF
+    ;;
+esac
+case "$PROJ_DEBUG" in
+  [Oo][Nn]|[Oo][Ff][Ff]) ;;
+  *)
+    echo "[$(date)] Invalid PROJ_DEBUG (must be ON or OFF), using OFF" >> /var/log/onearth/config.log
+    PROJ_DEBUG=OFF
+    ;;
+esac
 echo "[$(date)] Using MS_DEBUGLEVEL=$MS_DEBUGLEVEL CPL_DEBUG=$CPL_DEBUG PROJ_DEBUG=$PROJ_DEBUG" >> /var/log/onearth/config.log
 
-# A DEBUG line in a mapfile overrides MS_DEBUGLEVEL, so apply the level to the headers as well
+# DEBUG and CONFIG "CPL_DEBUG"/"PROJ_DEBUG" lines in a mapfile override the environment, so apply the levels to the headers as well
 for h in /etc/onearth/config/mapserver/*.header; do
   [ -f "$h" ] || continue
-  sed -i -E "s/^([[:space:]]*)DEBUG[[:space:]]+([0-9]+|ON|OFF)[[:space:]]*$/\1Debug $MS_DEBUGLEVEL/I" "$h" \
+  sed -i -E \
+    -e "s/^([[:space:]]*)DEBUG[[:space:]]+([0-9]+|ON|OFF)[[:space:]]*$/\1Debug $MS_DEBUGLEVEL/I" \
+    -e "s/^([[:space:]]*)CONFIG[[:space:]]+\"CPL_DEBUG\"[[:space:]]+\"[^\"]*\"/\1CONFIG \"CPL_DEBUG\" \"$CPL_DEBUG\"/I" \
+    -e "s/^([[:space:]]*)CONFIG[[:space:]]+\"PROJ_DEBUG\"[[:space:]]+\"[^\"]*\"/\1CONFIG \"PROJ_DEBUG\" \"$PROJ_DEBUG\"/I" \
+    "$h" \
     || echo "[$(date)] WARNING: could not set Debug level in $h" >> /var/log/onearth/config.log
 done
 
@@ -205,6 +223,9 @@ sleep 2
 
 # Run logrotate hourly
 echo "0 * * * * /etc/cron.hourly/logrotate" >> /etc/crontab
+
+# Check the MapServer error log against maxsize between the hourly logrotate runs
+echo "5-55/10 * * * * /usr/sbin/logrotate -s /var/lib/logrotate/logrotate.status /etc/logrotate.d/mapserver" >> /etc/crontab
 
 # Clean up temp files older than 60 minutes
 echo "*/30 * * * * find /tmp -mindepth 1 -type f -mmin +60 -delete" >> /etc/crontab
