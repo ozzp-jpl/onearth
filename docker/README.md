@@ -75,12 +75,46 @@ OnEarth Docker containers accept the following environment variables. Use the `-
 * USE_LOCAL_SHAPEFILES: `true/false` (defaults `false`) whether to configure OnEarth to load shapefiles from `SHAPEFILE_BUCKET` (when `false`) or from `/onearth/shapefiles/` (when `true`) for WMS requests. Use of local files is generally much faster than reading from S3. Ignored when `SHAPEFILE_BUCKET` isn't specified.
 * ENDPOINT_REFRESH: Interval for refreshing the WMS endpoints in minutes
 * SERVER_STATUS: `true/false` (defaults `false`) whether to enable the [mod_status](https://httpd.apache.org/docs/2.4/mod/mod_status.html) Apache server status page for this service (/server-status)
+* ONEARTH_LOG_ROOT: optional writable log mount. Logs go to `$ONEARTH_LOG_ROOT/<container hostname>/{mapserver,onearth,httpd,cron_jobs.log}`; the directory must be writable by the container's `www-data` user, otherwise logs fall back to `/var/log`
 * MS_DEBUGLEVEL: MapServer debug level `0`-`5` (defaults `0`). Applied to the `Debug` line of every mapfile header in `/etc/onearth/config/mapserver/` and passed to mapserv.fcgi processes; invalid values fall back to `0`
 * CPL_DEBUG: `ON/OFF` (defaults `OFF`) GDAL debug output, passed to mapserv.fcgi processes and applied to `CONFIG "CPL_DEBUG"` lines in mapfile headers; invalid values fall back to `OFF`
 * PROJ_DEBUG: `ON/OFF` (defaults `OFF`) PROJ debug output, passed to mapserv.fcgi processes and applied to `CONFIG "PROJ_DEBUG"` lines in mapfile headers; invalid values fall back to `OFF`
 * HealthCheck: http://localhost/wms/oe-status_reproject/wms.cgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/jpeg&TRANSPARENT=true&LAYERS=Raster_Status,Vector_Status&CRS=EPSG:3857&STYLES=&WIDTH=256&HEIGHT=256&BBOX=-20037508.34,-20037508.34,20037508.34,20037508.34
 
 See [OnEarth Configuration](../doc/configuration.md) for more information.
+
+### Production disk usage (EC2)
+
+Production ECS EC2 hosts already mount EFS at `/onearth` and bind-mount it into the WMS container at `/onearth`; no new volume is needed. Set this environment entry:
+
+```json
+"environment": [
+  {"name": "ONEARTH_LOG_ROOT", "value": "/onearth/logs/wms"}
+]
+```
+
+Each container writes under its own `<hostname>` subdirectory. In ECS bridge mode, the hostname is the short container ID, so each new task creates a new directory; prune old task directories with a host-side `find` cleanup or an EFS lifecycle policy. For a direct Docker run using an EC2 host where EFS is mounted at `/onearth`:
+
+```sh
+docker run -v /onearth:/onearth -e ONEARTH_LOG_ROOT=/onearth/logs/wms \
+  --tmpfs /run/httpd:size=16m,mode=1777 \
+  --log-driver=json-file --log-opt max-size=50m --log-opt max-file=3 \
+  nasagibs/onearth-wms:latest
+```
+
+For ECS, use the same `environment` entry above and configure `/run/httpd` as tmpfs:
+
+```hcl
+linuxParameters = {
+  tmpfs = [{
+    containerPath = "/run/httpd"
+    size          = 16 # MiB
+    mountOptions  = ["mode=1777"]
+  }]
+}
+```
+
+The EFS path must be writable by `www-data`; startup warns and retains local logs if it is not. Unix sockets must stay on local storage (the `/run/httpd` tmpfs), not EFS/NFS. Production uses the `awslogs` driver, so container stdout/stderr is sent to CloudWatch rather than written to the host disk. Docker run users should set `--log-opt max-size=50m --log-opt max-file=3` or use `awslogs`.
 
 ### Test Layers
 
