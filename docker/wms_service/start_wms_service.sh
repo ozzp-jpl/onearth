@@ -17,6 +17,8 @@ log_root_warning() {
 if [ -n "${ONEARTH_LOG_ROOT:-}" ]; then
   LOG_DIR="$ONEARTH_LOG_ROOT/$(cat /proc/sys/kernel/hostname)"
   if mkdir -p "$LOG_DIR/mapserver" "$LOG_DIR/onearth" "$LOG_DIR/httpd" && [ -w "$LOG_DIR" ]; then
+    LOG_ROOT_ACTIVE=true
+    LOG_HOST=$(basename "$LOG_DIR")
     for d in mapserver onearth httpd; do
       if [ -L "/var/log/$d" ] && [ "$(readlink "/var/log/$d")" = "$LOG_DIR/$d" ]; then
         continue
@@ -268,6 +270,11 @@ echo "5-55/10 * * * * /usr/sbin/logrotate -s /var/lib/logrotate/logrotate.status
 
 # Clean up temp files older than 60 minutes
 echo "*/30 * * * * find /tmp -mindepth 1 -type f -mmin +60 -delete" >> /etc/crontab
+
+# Remove log directories left on ONEARTH_LOG_ROOT by containers that no longer exist
+if [ "$LOG_ROOT_ACTIVE" = true ]; then
+  echo "17 3 * * * sh /home/oe2/onearth/docker/wms_service/cleanup_log_root.sh \"$ONEARTH_LOG_ROOT\" \"${ONEARTH_LOG_RETENTION_DAYS:-7}\" \"$LOG_HOST\"" >> /etc/crontab
+fi
 
 # Start cron
 supercronic -debug /etc/crontab > /var/log/cron_jobs.log 2>&1 &
