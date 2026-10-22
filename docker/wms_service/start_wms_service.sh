@@ -273,7 +273,10 @@ echo "*/30 * * * * find /tmp -mindepth 1 -type f -mmin +60 -delete" >> /etc/cron
 
 # Remove log directories left on ONEARTH_LOG_ROOT by containers that no longer exist
 if [ "$LOG_ROOT_ACTIVE" = true ]; then
-  echo "17 3 * * * sh /home/oe2/onearth/docker/wms_service/cleanup_log_root.sh \"$ONEARTH_LOG_ROOT\" \"${ONEARTH_LOG_RETENTION_DAYS:-7}\" \"$LOG_HOST\"" >> /etc/crontab
+  case "$ONEARTH_LOG_RETENTION_DAYS" in
+    ''|*[!0-9]*|0) ONEARTH_LOG_RETENTION_DAYS=7 ;;
+  esac
+  echo "17 3 * * * sh /home/oe2/onearth/docker/wms_service/cleanup_log_root.sh \"$ONEARTH_LOG_ROOT\" \"$ONEARTH_LOG_RETENTION_DAYS\" \"$LOG_HOST\"" >> /etc/crontab
 fi
 
 # Start cron
