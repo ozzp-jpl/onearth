@@ -199,9 +199,14 @@ echo "[$(date)] Completed healthcheck wait" >> /var/log/onearth/config.log
 sh load_endpoints.sh
 
 # Set up cron job for refreshing endpoints
-# Drop job lines from previous starts so restarts don't duplicate cron entries
+# Drop WMS-managed jobs from previous starts so restarts don't duplicate cron entries
 crontab_base=$(mktemp)
-grep -Ev '^[[:space:]]*[0-9*@]' /etc/crontab > "$crontab_base"
+grep -vF \
+  -e '/home/oe2/onearth/docker/wms_service/' \
+  -e '/etc/cron.hourly/logrotate' \
+  -e '/etc/logrotate.d/mapserver' \
+  -e 'find /tmp -mindepth 1 -type f -mmin +60 -delete' \
+  /etc/crontab > "$crontab_base"
 cat "$crontab_base" > /etc/crontab
 rm -f "$crontab_base"
 
