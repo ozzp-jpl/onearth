@@ -75,9 +75,47 @@ OnEarth Docker containers accept the following environment variables. Use the `-
 * USE_LOCAL_SHAPEFILES: `true/false` (defaults `false`) whether to configure OnEarth to load shapefiles from `SHAPEFILE_BUCKET` (when `false`) or from `/onearth/shapefiles/` (when `true`) for WMS requests. Use of local files is generally much faster than reading from S3. Ignored when `SHAPEFILE_BUCKET` isn't specified.
 * ENDPOINT_REFRESH: Interval for refreshing the WMS endpoints in minutes
 * SERVER_STATUS: `true/false` (defaults `false`) whether to enable the [mod_status](https://httpd.apache.org/docs/2.4/mod/mod_status.html) Apache server status page for this service (/server-status)
+* ONEARTH_LOG_ROOT: optional writable, dedicated log directory (e.g. `/onearth/logs/wms`). Logs go to `$ONEARTH_LOG_ROOT/<container hostname>/{mapserver,onearth,httpd,cron_jobs.log}`; it must be writable by the container's `www-data` user; if it is unwritable (or contains files it can't write), logs fall back to `/var/log`. Only child directories carrying the regular `.onearth-wms-logs` marker are eligible for pruning
+* ONEARTH_LOG_RETENTION_DAYS: number of days to retain marked per-container log directories under `ONEARTH_LOG_ROOT` (defaults to `7`). A daily job at 03:17 removes other marked directories with no writes in that many days; unmarked directories and a container's own directory are never removed
+* MS_DEBUGLEVEL: MapServer debug level `0`-`5` (defaults `0`). Applied to the `Debug` line of every mapfile header in `/etc/onearth/config/mapserver/` and passed to mapserv.fcgi processes; invalid values fall back to `0`
+* CPL_DEBUG: `ON/OFF` (defaults `OFF`) GDAL debug output, passed to mapserv.fcgi processes and applied to `CONFIG "CPL_DEBUG"` lines in mapfile headers; invalid values fall back to `OFF`
+* PROJ_DEBUG: `ON/OFF` (defaults `OFF`) PROJ debug output, passed to mapserv.fcgi processes and applied to `CONFIG "PROJ_DEBUG"` lines in mapfile headers; invalid values fall back to `OFF`
 * HealthCheck: http://localhost/wms/oe-status_reproject/wms.cgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/jpeg&TRANSPARENT=true&LAYERS=Raster_Status,Vector_Status&CRS=EPSG:3857&STYLES=&WIDTH=256&HEIGHT=256&BBOX=-20037508.34,-20037508.34,20037508.34,20037508.34
 
 See [OnEarth Configuration](../doc/configuration.md) for more information.
+
+### Production disk usage (EC2)
+
+Production ECS EC2 hosts already mount EFS at `/onearth` and bind-mount it into the WMS container at `/onearth`; no new volume is needed. Set this environment entry:
+
+```json
+"environment": [
+  {"name": "ONEARTH_LOG_ROOT", "value": "/onearth/logs/wms"}
+]
+```
+
+Each container writes under its own `<hostname>` subdirectory. In ECS bridge mode, the hostname is the short container ID, so each new task creates a new directory. A daily cleanup job at 03:17 removes inactive child directories carrying the `.onearth-wms-logs` marker according to `ONEARTH_LOG_RETENTION_DAYS` (default `7`), excluding the current container's directory. Keep `ONEARTH_LOG_ROOT` dedicated to WMS logs; unmarked directories are never pruned. For a direct Docker run using an EC2 host where EFS is mounted at `/onearth`:
+
+```sh
+docker run -v /onearth:/onearth -e ONEARTH_LOG_ROOT=/onearth/logs/wms \
+  --tmpfs /run/httpd:size=16m,mode=1777 \
+  --log-driver=json-file --log-opt max-size=50m --log-opt max-file=3 \
+  nasagibs/onearth-wms:latest
+```
+
+For ECS, use the same `environment` entry above and configure `/run/httpd` as tmpfs:
+
+```hcl
+linuxParameters = {
+  tmpfs = [{
+    containerPath = "/run/httpd"
+    size          = 16 # MiB
+    mountOptions  = ["mode=1777"]
+  }]
+}
+```
+
+The EFS path must be writable by `www-data`; startup warns and retains local logs if it is not. Unix sockets must stay on local storage (the `/run/httpd` tmpfs), not EFS/NFS. Production uses the `awslogs` driver, so container stdout/stderr is sent to CloudWatch rather than written to the host disk. Docker run users should set `--log-opt max-size=50m --log-opt max-file=3` or use `awslogs`.
 
 ### Test Layers
 
