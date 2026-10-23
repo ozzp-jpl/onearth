@@ -199,6 +199,12 @@ echo "[$(date)] Completed healthcheck wait" >> /var/log/onearth/config.log
 sh load_endpoints.sh
 
 # Set up cron job for refreshing endpoints
+# Drop job lines from previous starts so restarts don't duplicate cron entries
+crontab_base=$(mktemp)
+grep -Ev '^[[:space:]]*[0-9*@]' /etc/crontab > "$crontab_base"
+cat "$crontab_base" > /etc/crontab
+rm -f "$crontab_base"
+
 if [ -z "$ENDPOINT_REFRESH" ]
 then
 	echo "ENDPOINT_REFRESH not set...using default of 60 minutes"
