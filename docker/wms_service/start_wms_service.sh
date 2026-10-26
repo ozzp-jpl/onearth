@@ -242,7 +242,7 @@ echo "5-55/10 * * * * /usr/sbin/logrotate -s /var/lib/logrotate/logrotate.status
 echo "*/30 * * * * find /tmp -mindepth 1 -type f -mmin +60 -delete" >> /etc/crontab
 
 # Start cron
-supercronic -debug /etc/crontab > /var/log/cron_jobs.log 2>&1 &
+supercronic -debug /etc/crontab >> /var/log/cron_jobs.log 2>&1 &
 
 # Tail the logs
 exec tail -qFn 1000 \
