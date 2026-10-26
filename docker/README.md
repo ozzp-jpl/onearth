@@ -84,7 +84,7 @@ See [OnEarth Configuration](../doc/configuration.md) for more information.
 
 ### Production disk usage (EC2)
 
-WMS logs stay on the container's local disk under `/var/log`, and rotation keeps them bounded. The MapServer error log rotates hourly, or within 10 minutes once it passes 100M, and 5 rotated files are kept. MapServer, GDAL and PROJ debug output is off by default (see `MS_DEBUGLEVEL`, `CPL_DEBUG` and `PROJ_DEBUG`). A cron job deletes files in `/tmp` older than 60 minutes.
+WMS logs stay on the container's local disk under `/var/log`, and rotation keeps them bounded. The MapServer error log and `/var/log/cron_jobs.log` rotate hourly, or within 10 minutes once they pass 100M, and 5 rotated files of each are kept. MapServer, GDAL and PROJ debug output is off by default (see `MS_DEBUGLEVEL`, `CPL_DEBUG` and `PROJ_DEBUG`). A cron job deletes files in `/tmp` older than 60 minutes.
 
 Mount `/run/httpd` as tmpfs. It is the target of `/etc/httpd/run`, where Apache keeps its pid file and the mod_fcgid sockets, so on tmpfs those files never land on the host root disk. `mode=1777` is required. Without it, the tmpfs is created as `root:root` with the image's `710` mode, and Apache, which runs as `www-data`, can't write its pid file and won't start. Don't put the Unix sockets on EFS/NFS.
 
