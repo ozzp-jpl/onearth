@@ -73,6 +73,53 @@ cp ../oe-status/layers/* $(yq eval ".layer_config_source" /etc/onearth/config/en
 mkdir -p $(yq eval ".twms_service.internal_endpoint" /etc/onearth/config/endpoint/oe-status_reproject.yaml)
 cp ../oe-status/mapserver/oe-status_reproject.header /etc/onearth/config/mapserver/
 
+# MapServer/GDAL/PROJ debug levels (production defaults; override per environment, e.g. docker run -e MS_DEBUGLEVEL=3)
+MS_DEBUGLEVEL=${MS_DEBUGLEVEL:-0}
+CPL_DEBUG=${CPL_DEBUG:-OFF}
+PROJ_DEBUG=${PROJ_DEBUG:-OFF}
+case "$MS_DEBUGLEVEL" in
+  [0-5]) ;;
+  *)
+    echo "[$(date)] Invalid MS_DEBUGLEVEL '$MS_DEBUGLEVEL' (must be 0-5), using 0" >> /var/log/onearth/config.log
+    MS_DEBUGLEVEL=0
+    ;;
+esac
+case "$CPL_DEBUG" in
+  [Oo][Nn]|[Oo][Ff][Ff]) ;;
+  *)
+    echo "[$(date)] Invalid CPL_DEBUG (must be ON or OFF), using OFF" >> /var/log/onearth/config.log
+    CPL_DEBUG=OFF
+    ;;
+esac
+case "$PROJ_DEBUG" in
+  [Oo][Nn]|[Oo][Ff][Ff]) ;;
+  *)
+    echo "[$(date)] Invalid PROJ_DEBUG (must be ON or OFF), using OFF" >> /var/log/onearth/config.log
+    PROJ_DEBUG=OFF
+    ;;
+esac
+echo "[$(date)] Using MS_DEBUGLEVEL=$MS_DEBUGLEVEL CPL_DEBUG=$CPL_DEBUG PROJ_DEBUG=$PROJ_DEBUG" >> /var/log/onearth/config.log
+
+# DEBUG and CONFIG "CPL_DEBUG"/"PROJ_DEBUG" lines in a mapfile override the environment, so apply the levels to the headers as well
+for h in /etc/onearth/config/mapserver/*.header; do
+  [ -f "$h" ] || continue
+  sed -i -E \
+    -e "s/^([[:space:]]*)DEBUG[[:space:]]+([0-9]+|ON|OFF)[[:space:]]*$/\1Debug $MS_DEBUGLEVEL/I" \
+    -e "s/^([[:space:]]*)CONFIG[[:space:]]+\"CPL_DEBUG\"[[:space:]]+\"[^\"]*\"/\1CONFIG \"CPL_DEBUG\" \"$CPL_DEBUG\"/I" \
+    -e "s/^([[:space:]]*)CONFIG[[:space:]]+\"PROJ_DEBUG\"[[:space:]]+\"[^\"]*\"/\1CONFIG \"PROJ_DEBUG\" \"$PROJ_DEBUG\"/I" \
+    "$h" \
+    || echo "[$(date)] WARNING: could not set Debug level in $h" >> /var/log/onearth/config.log
+done
+
+# mapserv.fcgi processes don't inherit the container environment
+cat > /etc/httpd/conf.d/oe2_wms_debug.conf <<EOS
+<IfModule fcgid_module>
+    FcgidInitialEnv MS_DEBUGLEVEL $MS_DEBUGLEVEL
+    FcgidInitialEnv CPL_DEBUG $CPL_DEBUG
+    FcgidInitialEnv PROJ_DEBUG $PROJ_DEBUG
+</IfModule>
+EOS
+
 # Copy tilematrixsets config file
 mkdir -p /etc/onearth/config/conf/
 cp /home/oe2/onearth/src/modules/mod_wmts_wrapper/configure_tool/tilematrixsets.xml /etc/onearth/config/conf/
@@ -111,6 +158,17 @@ echo "[$(date)] Completed healthcheck wait" >> /var/log/onearth/config.log
 sh load_endpoints.sh
 
 # Set up cron job for refreshing endpoints
+# Drop WMS-managed jobs from previous starts so restarts don't duplicate cron entries
+crontab_base=$(mktemp)
+grep -vF \
+  -e '/home/oe2/onearth/docker/wms_service/' \
+  -e '/etc/cron.hourly/logrotate' \
+  -e '/etc/logrotate.d/mapserver' \
+  -e 'find /tmp -mindepth 1 -type f -mmin +60 -delete' \
+  /etc/crontab > "$crontab_base"
+cat "$crontab_base" > /etc/crontab
+rm -f "$crontab_base"
+
 if [ -z "$ENDPOINT_REFRESH" ]
 then
 	echo "ENDPOINT_REFRESH not set...using default of 60 minutes"
@@ -167,6 +225,9 @@ else
   rm -f /etc/httpd/conf.d/oe2_ssl.conf
 fi
 
+# Remove stale mod_fcgid sockets left over from a previous run
+rm -f /etc/httpd/run/fcgidsock/*
+
 echo "[$(date)] Restarting Apache server" >> /var/log/onearth/config.log
 /usr/sbin/httpd -k start
 sleep 2
@@ -174,8 +235,14 @@ sleep 2
 # Run logrotate hourly
 echo "0 * * * * /etc/cron.hourly/logrotate" >> /etc/crontab
 
+# Check the MapServer error log against maxsize between the hourly logrotate runs
+echo "5-55/10 * * * * /usr/sbin/logrotate -s /var/lib/logrotate/logrotate.status /etc/logrotate.d/mapserver" >> /etc/crontab
+
+# Clean up temp files older than 60 minutes
+echo "*/30 * * * * find /tmp -mindepth 1 -type f -mmin +60 -delete" >> /etc/crontab
+
 # Start cron
-supercronic -debug /etc/crontab > /var/log/cron_jobs.log 2>&1 &
+supercronic -debug /etc/crontab >> /var/log/cron_jobs.log 2>&1 &
 
 # Tail the logs
 exec tail -qFn 1000 \
