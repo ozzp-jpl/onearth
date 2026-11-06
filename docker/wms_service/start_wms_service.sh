@@ -261,7 +261,9 @@ chmod 755 /usr/local/bin/oe2_fcgid_sock_sweep.sh
 
 # wms.cgi exits with SIGSEGV when GDAL teardown touches the freed FastCGI environment (see doc/wms_fastcgi_teardown_segfault.md);
 # each core is 200-800 MB and a systemd-coredump run on the host, so cores are disabled for httpd and its children
-# (soft and hard limit) unless CORE_DUMPS=ON is set for debugging.
+# (soft and hard limit) unless CORE_DUMPS=ON is set for debugging. The kernel still invokes a piped core_pattern
+# handler with RLIMIT_CORE=0, but it passes the limit as %c and systemd-coredump exits on a limit below one page
+# before reading the pipe ("Resource limits disable core dumping"), the same path as ProcessSizeMax=0.
 case "$CORE_DUMPS" in
   [Oo][Nn]) echo "[$(date)] CORE_DUMPS=ON, core dumps left enabled" >> /var/log/onearth/config.log ;;
   *) ulimit -c 0 || echo "[$(date)] WARNING: could not disable core dumps" >> /var/log/onearth/config.log ;;
