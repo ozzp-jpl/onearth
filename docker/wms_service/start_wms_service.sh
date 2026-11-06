@@ -259,6 +259,13 @@ exit 0
 EOS
 chmod 755 /usr/local/bin/oe2_fcgid_sock_sweep.sh
 
+# wms.cgi exits with SIGSEGV when GDAL teardown touches the freed FastCGI environment (see doc/wms_fastcgi_teardown_segfault.md);
+# each core is 200-800 MB and a systemd-coredump run on the host, so cores are disabled for httpd and its children
+# (soft and hard limit) unless CORE_DUMPS=ON is set for debugging.
+case "$CORE_DUMPS" in
+  [Oo][Nn]) echo "[$(date)] CORE_DUMPS=ON, core dumps left enabled" >> /var/log/onearth/config.log ;;
+  *) ulimit -c 0 || echo "[$(date)] WARNING: could not disable core dumps" >> /var/log/onearth/config.log ;;
+esac
 echo "[$(date)] Restarting Apache server" >> /var/log/onearth/config.log
 /usr/sbin/httpd -k start
 sleep 2

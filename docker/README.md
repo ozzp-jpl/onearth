@@ -78,6 +78,7 @@ OnEarth Docker containers accept the following environment variables. Use the `-
 * MS_DEBUGLEVEL: MapServer debug level `0`-`5` (defaults `0`). Applied to the `Debug` line of every mapfile header in `/etc/onearth/config/mapserver/` and passed to mapserv.fcgi processes; invalid values fall back to `0`
 * CPL_DEBUG: `ON/OFF` (defaults `OFF`) GDAL debug output, passed to mapserv.fcgi processes and applied to `CONFIG "CPL_DEBUG"` lines in mapfile headers (inserted when a header has none, so GDAL answers the lookup from its option table instead of `getenv()`, which crashes wms.cgi at process exit); invalid values fall back to `OFF`
 * PROJ_DEBUG: `ON/OFF` (defaults `OFF`) PROJ debug output, passed to mapserv.fcgi processes and applied to `CONFIG "PROJ_DEBUG"` lines in mapfile headers; invalid values fall back to `OFF`
+* CORE_DUMPS: `ON/OFF` (defaults `OFF`) core dumps for httpd and the wms.cgi processes it spawns; `OFF` sets the core size limit (soft and hard) to 0 before Apache starts so a crashing process leaves no core on the host
 * HealthCheck: http://localhost/wms/oe-status_reproject/wms.cgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/jpeg&TRANSPARENT=true&LAYERS=Raster_Status,Vector_Status&CRS=EPSG:3857&STYLES=&WIDTH=256&HEIGHT=256&BBOX=-20037508.34,-20037508.34,20037508.34,20037508.34
 
 See [OnEarth Configuration](../doc/configuration.md) for more information.
