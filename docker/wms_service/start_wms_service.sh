@@ -139,6 +139,7 @@ for f in $(grep -l mapserver /etc/onearth/config/endpoint/*.yaml); do
   cp /var/www/cgi-bin/mapserv.fcgi ${REDIRECT_ENDPOINT}/wms.cgi
 done
 
+# Keep HEALTHCHECK --start-period in Dockerfile above the worst-case duration of this wait
 time_out=600
 echo "[$(date)] Begin checking $GC_HEALTHCHECK endpoint...">>/var/log/onearth/config.log 2>&1;
 while [[ "$(curl -s -m 60 -o /dev/null -w ''%{http_code}'' "$GC_HEALTHCHECK")" != "200" ]]; do 
