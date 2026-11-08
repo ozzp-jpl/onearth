@@ -89,6 +89,8 @@ WMS logs stay on the container's local disk under `/var/log`, and rotation keeps
 
 Mount `/run/httpd` as tmpfs. It is the target of `/etc/httpd/run`, where Apache keeps its pid file and the mod_fcgid sockets, so on tmpfs those files never land on the host root disk. `mode=1777` is required. Without it, the tmpfs is created as `root:root` with the image's `710` mode, and Apache, which runs as `www-data`, can't write its pid file and won't start. Don't put the Unix sockets on EFS/NFS.
 
+`mode=1777` (world-writable with the sticky bit, like `/tmp`) is used instead of `uid=`/`gid=` mount options on purpose. The image runs every process as `www-data` (`USER www-data` in the Dockerfile), so there is no other unprivileged user to lock out, and root ignores mode bits anyway. `www-data` is created without a fixed UID (`useradd -g www-data www-data`, currently 1000), so a `uid=1000` mount option would tie the deployment to a value the image doesn't guarantee: if a base-image change shifted it, Apache could not write its pid file and the task would crash-loop. If you want the owner pinned, pin it in both places: `groupadd -g 1000 www-data && useradd -u 1000 -g www-data www-data` in the Dockerfile and `mountOptions = ["mode=0755", "uid=1000", "gid=1000"]` in the task definition.
+
 ```sh
 docker run --tmpfs /run/httpd:size=16m,mode=1777 \
   --log-driver=json-file --log-opt max-size=50m --log-opt max-file=3 \
