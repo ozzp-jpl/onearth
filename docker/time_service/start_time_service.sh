@@ -138,8 +138,8 @@ echo "0 * * * * /etc/cron.hourly/logrotate" >> /etc/crontab
 # Start cron
 supercronic -debug /etc/crontab > /var/log/cron_jobs.log 2>&1 &
 
-# Run htcacheclean daemon
-htcacheclean -d 90 -l 512M -p /tmp/
+# -l counts file bytes, but small entries take a full block, so -L (inodes) bounds disk use.
+htcacheclean -d 30 -t -l 64M -L 200000 -p /tmp/apache
 
 # Tail the logs
 exec tail -qFn 10000 \
