@@ -271,6 +271,8 @@ for layer in layers:
     layer_config = next((lc for lc in layer_configs if layer_name + ".yaml" in lc['path']), False)
     wms_layer_group = ""
     offsite = ""
+    show_hidden_colors = False
+    nodata_rgb = None
     if layer_config:
         try:
             wms_layer_group = '"wms_layer_group"       "{0}"'.format(layer_config['config']['wms_layer_group'])
@@ -278,6 +280,16 @@ for layer in layers:
             print("WARN: Layer config {0} has no field 'wms_layer_group'".format(layer_config['path']))
 
         if layer_config['config'].get('convert_mrf'):
+            offsite = "OFFSITE  0 0 0"
+
+        show_hidden_colors = str(layer_config['config'].get('wms_show_hidden_colors')).lower() == 'true' and bands_count == 4
+        # GDAL wants space-separated values; a comma-separated value would silently apply the first number to every band
+        nodata_rgb = re.findall(r'\d+', str(layer_config['config'].get('wms_nodata_rgb', '')))
+        if show_hidden_colors and len(nodata_rgb) not in (0, 3):
+            print("WARN: Layer config {0} has invalid 'wms_nodata_rgb', ignoring".format(layer_config['path']))
+            nodata_rgb = None
+        if show_hidden_colors:
+            # Empty tiles (Blank_RGBA) decode to black once alpha is dropped
             offsite = "OFFSITE  0 0 0"
     else:
         print("WARN: Layer config for layer {0} not found".format(layer_name))
@@ -404,7 +416,14 @@ for layer in layers:
             etree.SubElement(out_root, 'Projection').text = epsg_code
         etree.SubElement(out_root, 'BlockSizeX').text = str(tile_width)
         etree.SubElement(out_root, 'BlockSizeY').text = str(tile_height)
-        etree.SubElement(out_root, 'BandsCount').text = str(bands_count)
+        # Colormap entries marked transparent keep their RGB under alpha=0 in the source PNG tiles. Reading only the
+        # RGB bands draws them opaque. The nodata color, missing tiles (filled with it) and OFFSITE black stay transparent.
+        if show_hidden_colors:
+            etree.SubElement(out_root, 'BandsCount').text = '3'
+            if nodata_rgb:
+                etree.SubElement(out_root, 'DataValues').set('NoData', ' '.join(nodata_rgb))
+        else:
+            etree.SubElement(out_root, 'BandsCount').text = str(bands_count)
 
         etree.SubElement(out_root, 'ZeroBlockHttpCodes').text = '404,400'
         etree.SubElement(out_root, 'ZeroBlockOnServerException').text = 'true'

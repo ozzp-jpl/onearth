@@ -1,0 +1,24 @@
+layer_id: "test_palette_png_hidden_colors"
+layer_title: "test_palette_png_hidden_colors"
+layer_name: "test_palette_png_hidden_colors tileset"
+projection: "EPSG:4326"
+tilematrixset: "16km"
+mime_type: "image/png"
+static: true
+abstract: "test_palette_png_hidden_colors abstract"
+wms_layer_group: "/test_palette_png_hidden_colors"
+wms_show_hidden_colors: true
+wms_nodata_rgb: "139 0 0"
+metadata:
+  - {}
+source_mrf:
+  size_x: 2560
+  size_y: 1280
+  bands: 1
+  tile_size_x: 512
+  tile_size_y: 512
+  idx_path: "/home/oe2/onearth/src/test/mapserver_test_data/test_imagery/test_palette_png/test_palette_png.idx"
+  data_file_uri: "/home/oe2/onearth/src/test/mapserver_test_data/test_imagery/test_palette_png/test_palette_png.ppg"
+  year_dir: false
+  bbox: -180,-90,180,90
+  empty_tile: "/etc/onearth/empty_tiles/Blank_RGBA_512.png"
