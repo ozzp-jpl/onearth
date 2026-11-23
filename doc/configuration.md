@@ -364,7 +364,7 @@ wms_show_hidden_colors: "true/false, render colormap entries that are transparen
 wms_nodata_rgb: "RGB of the colormap entry that stays transparent when wms_show_hidden_colors is set (e.g. \"139 0 0\")"
 ```
 
-Colormap entries marked transparent keep their RGB values under alpha=0 in PNG tiles. With `wms_show_hidden_colors: true`, the WMS reads only the RGB bands of a PNG layer, so those entries are drawn opaque. Only pixels matching `wms_nodata_rgb` (and missing tiles) stay transparent; if it is not set, the whole layer is opaque.
+Colormap entries marked transparent keep their RGB values under alpha=0 in PNG tiles. With `wms_show_hidden_colors: true`, the WMS reads only the RGB bands of a PNG layer, so those entries are drawn opaque. Only pixels matching `wms_nodata_rgb`, black pixels (`0 0 0`, e.g. empty tiles) and missing tiles stay transparent.
 
 ### Sample Layer Configurations
 ```

@@ -284,6 +284,9 @@ for layer in layers:
 
         show_hidden_colors = bool(layer_config['config'].get('wms_show_hidden_colors'))
         nodata_rgb = layer_config['config'].get('wms_nodata_rgb')
+        if show_hidden_colors:
+            # Empty tiles (Blank_RGBA) decode to black once alpha is dropped
+            offsite = "OFFSITE  0 0 0"
     else:
         print("WARN: Layer config for layer {0} not found".format(layer_name))
 
@@ -410,7 +413,7 @@ for layer in layers:
         etree.SubElement(out_root, 'BlockSizeX').text = str(tile_width)
         etree.SubElement(out_root, 'BlockSizeY').text = str(tile_height)
         # Colormap entries marked transparent keep their RGB under alpha=0 in the source PNG tiles. Reading only the
-        # RGB bands draws them opaque. The nodata color (and missing tiles, which GDAL fills with it) stays transparent.
+        # RGB bands draws them opaque. The nodata color, missing tiles (filled with it) and OFFSITE black stay transparent.
         if show_hidden_colors and bands_count == 4:
             etree.SubElement(out_root, 'BandsCount').text = '3'
             if nodata_rgb:
