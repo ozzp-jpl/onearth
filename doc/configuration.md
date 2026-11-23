@@ -357,6 +357,15 @@ See [doc/time_detection.md](time_detection.md) for time period configuration inf
 
 See [src/modules/mod_wmts_wrapper/configure_tool/](../src/modules/mod_wmts_wrapper/configure_tool/README.md) for more details.
 
+### Optional for WMS
+```
+wms_layer_group: "Layer group path in the WMS GetCapabilities (e.g. /Sea Ice)"
+wms_show_hidden_colors: "true/false, render colormap entries that are transparent in the source PNG tiles"
+wms_nodata_rgb: "RGB of the colormap entry that stays transparent when wms_show_hidden_colors is set (e.g. \"139 0 0\")"
+```
+
+Colormap entries marked transparent keep their RGB values under alpha=0 in PNG tiles. With `wms_show_hidden_colors: true`, the WMS reads only the RGB bands of a PNG layer, so those entries are drawn opaque. Only pixels matching `wms_nodata_rgb` (and missing tiles) stay transparent; if it is not set, the whole layer is opaque.
+
 ### Sample Layer Configurations
 ```
 layer_id: "MODIS_Aqua_Brightness_Temp_Band31_Day"
