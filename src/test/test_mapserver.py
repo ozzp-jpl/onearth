@@ -30,6 +30,8 @@ import json
 import html
 from xml.etree import cElementTree as ElementTree
 from pathlib import Path
+from io import BytesIO
+from PIL import Image
 
 from oe_test_utils import check_tile_request, restart_apache, check_response_code, test_snap_request, file_text_replace, make_dir_tree, run_command, get_url, XmlDictConfig, check_dicts, check_wmts_error
 
@@ -875,6 +877,41 @@ class TestMapserver(unittest.TestCase):
         check_result = check_tile_request(req_url, ref_hash)
         self.assertTrue(check_result, 'static best shapefile layer request result does not match expected. URL: ' + req_url)
         rmtree(dest_dir)
+
+    def _get_palette_png_pixels(self, layer):
+        """
+        Requests the whole test_palette_png image through WMS at its coarsest resolution (640x320) and returns the
+        RGBA values at the centre of each region. The source palette is: 0 = 139,0,0 (nodata), 1 = 0,255,0,
+        2 = 100,200,255, 4 = 0,0,0, all with alpha 0, and 3 = 255,100,100, opaque. The fifth column has no tiles.
+        """
+        req_url = 'http://localhost/wms/test/wms.cgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image%2Fpng&TRANSPARENT=true&LAYERS=' + layer + '&CRS=EPSG%3A4326&STYLES=&WIDTH=640&HEIGHT=320&BBOX=-90%2C-180%2C90%2C180'
+        if DEBUG:
+            print('URL: ' + req_url)
+        img = Image.open(BytesIO(get_url(req_url).read())).convert('RGBA')
+        points = {'visible': (64, 160), 'hidden_1': (192, 160), 'hidden_2': (320, 160),
+                  'nodata': (448, 80), 'hidden_black': (448, 240), 'empty_tile': (576, 160)}
+        return {name: img.getpixel(xy) for name, xy in points.items()}, req_url
+
+    def test_request_wms_palette_png(self):
+        """
+        50. Request a paletted PNG layer via WMS: colormap entries that are transparent in the source stay transparent.
+        """
+        pixels, req_url = self._get_palette_png_pixels('test_palette_png')
+        self.assertEqual(pixels['visible'], (255, 100, 100, 255), 'Opaque colormap entry not drawn. URL: ' + req_url)
+        for name in ('hidden_1', 'hidden_2', 'nodata', 'hidden_black', 'empty_tile'):
+            self.assertEqual(pixels[name][3], 0, name + ' is not transparent. URL: ' + req_url)
+
+    def test_request_wms_show_hidden_colors(self):
+        """
+        51. Request a paletted PNG layer with wms_show_hidden_colors via WMS: transparent colormap entries are drawn
+        opaque, while the wms_nodata_rgb color, black pixels and empty tiles stay transparent.
+        """
+        pixels, req_url = self._get_palette_png_pixels('test_palette_png_hidden_colors')
+        self.assertEqual(pixels['visible'], (255, 100, 100, 255), 'Opaque colormap entry not drawn. URL: ' + req_url)
+        self.assertEqual(pixels['hidden_1'], (0, 255, 0, 255), 'Hidden colormap entry not drawn. URL: ' + req_url)
+        self.assertEqual(pixels['hidden_2'], (100, 200, 255, 255), 'Hidden colormap entry not drawn. URL: ' + req_url)
+        for name in ('nodata', 'hidden_black', 'empty_tile'):
+            self.assertEqual(pixels[name][3], 0, name + ' is not transparent. URL: ' + req_url)
 
     # TEARDOWN
 
