@@ -282,8 +282,12 @@ for layer in layers:
         if layer_config['config'].get('convert_mrf'):
             offsite = "OFFSITE  0 0 0"
 
-        show_hidden_colors = bool(layer_config['config'].get('wms_show_hidden_colors')) and bands_count == 4
-        nodata_rgb = layer_config['config'].get('wms_nodata_rgb')
+        show_hidden_colors = str(layer_config['config'].get('wms_show_hidden_colors')).lower() == 'true' and bands_count == 4
+        # GDAL wants space-separated values; a comma-separated value would silently apply the first number to every band
+        nodata_rgb = re.findall(r'\d+', str(layer_config['config'].get('wms_nodata_rgb', '')))
+        if show_hidden_colors and len(nodata_rgb) not in (0, 3):
+            print("WARN: Layer config {0} has invalid 'wms_nodata_rgb', ignoring".format(layer_config['path']))
+            nodata_rgb = None
         if show_hidden_colors:
             # Empty tiles (Blank_RGBA) decode to black once alpha is dropped
             offsite = "OFFSITE  0 0 0"
@@ -417,7 +421,7 @@ for layer in layers:
         if show_hidden_colors:
             etree.SubElement(out_root, 'BandsCount').text = '3'
             if nodata_rgb:
-                etree.SubElement(out_root, 'DataValues').set('NoData', str(nodata_rgb))
+                etree.SubElement(out_root, 'DataValues').set('NoData', ' '.join(nodata_rgb))
         else:
             etree.SubElement(out_root, 'BandsCount').text = str(bands_count)
 
