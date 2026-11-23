@@ -282,7 +282,7 @@ for layer in layers:
         if layer_config['config'].get('convert_mrf'):
             offsite = "OFFSITE  0 0 0"
 
-        show_hidden_colors = bool(layer_config['config'].get('wms_show_hidden_colors'))
+        show_hidden_colors = bool(layer_config['config'].get('wms_show_hidden_colors')) and bands_count == 4
         nodata_rgb = layer_config['config'].get('wms_nodata_rgb')
         if show_hidden_colors:
             # Empty tiles (Blank_RGBA) decode to black once alpha is dropped
@@ -414,7 +414,7 @@ for layer in layers:
         etree.SubElement(out_root, 'BlockSizeY').text = str(tile_height)
         # Colormap entries marked transparent keep their RGB under alpha=0 in the source PNG tiles. Reading only the
         # RGB bands draws them opaque. The nodata color, missing tiles (filled with it) and OFFSITE black stay transparent.
-        if show_hidden_colors and bands_count == 4:
+        if show_hidden_colors:
             etree.SubElement(out_root, 'BandsCount').text = '3'
             if nodata_rgb:
                 etree.SubElement(out_root, 'DataValues').set('NoData', str(nodata_rgb))
